@@ -207,7 +207,5 @@ marimo/_lsp/
 __marimo__/
 .venv311/
 # ignore the sqlite db and sidecar files
-db.sqlite
-db.sqlite-*
-db.sqlite-shm
-db.sqlite-wal
+app/db.sqlite
+
