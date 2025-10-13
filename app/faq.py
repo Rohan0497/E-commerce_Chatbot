@@ -6,7 +6,7 @@ from groq import Groq
 import os
 load_dotenv()
 
-faq_path = Path(__file__).parent / "faq_data.csv"
+faq_path = Path(__file__).parent / "resources/faq_data.csv"
 chroma_client = chromadb.Client()
 collection_name_faq = 'faqs'
 groq_client = Groq()

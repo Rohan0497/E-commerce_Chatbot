@@ -5,7 +5,7 @@ from pathlib import Path
 from app.sql import sql_chain
 from app.smalltalk import talk
 
-faq_path = Path(__file__).parent / "faq_data.csv"
+faq_path = Path(__file__).parent / "resources/faq_data.csv"
 ingest_faq_data(faq_path)
 
 def ask(query):
