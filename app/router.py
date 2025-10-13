@@ -27,9 +27,20 @@ sql = Route(
     ]
 )
 
-routes = [faq, sql]
+small_talk = Route(
+    name='small-talk',
+    utterances=[
+        "How are you?",
+        "What is your name?",
+        "Are you a robot?",
+        "What are you?",
+        "What do you do?",
+    ]
+)
+routes = [faq, sql, small_talk]
 router = SemanticRouter(routes=routes, encoder=encoder,auto_sync="local")
 
 if __name__ == "__main__":
     print(router("What is your policy on defective product?").name)
     print(router("Pink Puma shoes in price range 5000 to 1000").name)
+    print(router("How are you?").name)
