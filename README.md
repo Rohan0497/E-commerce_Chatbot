@@ -29,7 +29,7 @@ An agentic assistant for e-commerce stores. The bot understands customer goals, 
 flowchart LR
     user([User Query]) --> ui[Streamlit Chat UI]
     ui --> router{Intent Router}
-    router -->|Small talk| smalltalk[talk() helper]
+    router -->|Small talk| smalltalk[talk helper]
     router -->|Commerce| agent[Agent Loop]
 
     subgraph Agent Loop
