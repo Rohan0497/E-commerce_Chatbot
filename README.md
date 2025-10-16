@@ -12,7 +12,7 @@ Built with Llama 3.3 via Groq, Streamlit, ChromaDB, SQLite, and Hugging Face emb
 
 ---
 
-## ✨ Features
+##  Features
 
 -  **Semantic intent routing** → routes user messages to `faq` or `sql`
 -  **FAQ (RAG)** → retrieves top FAQ entries from **ChromaDB** and answers strictly from that context
@@ -89,7 +89,7 @@ This chatbot currently supports two intents:
 
 ---
 
-## 🧩 How It Works
+##  How It Works
 
 ### 🔹 Router
 Uses a sentence-transformer encoder (`all-MiniLM-L6-v2`) to embed and route each query.
@@ -106,7 +106,7 @@ Uses a sentence-transformer encoder (`all-MiniLM-L6-v2`) to embed and route each
 - The resulting dataframe is converted to natural-language output by another Groq call
 
 ---
-## 🧪 Testing
+##  Testing
 
 Run all tests:
 ```bash
@@ -167,4 +167,11 @@ Inspired by community implementations and tutorials (Codebasics series)
 
 Apache 2.0 — see LICENSE.
 
+
 ---
+
+##  Appendix — FAQ CSV Format
+
+question,answer
+What is your return policy?,You can return any item within 30 days of delivery if it's in original condition.
+Do you offer Cash on Delivery?,Yes, COD is available at checkout in select locations.
