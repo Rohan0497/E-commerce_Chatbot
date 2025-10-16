@@ -1,46 +1,90 @@
+"""
+Natural-language router using semantic intent matching.
+
+This module defines:
+- `RouteName`: canonical route names for handlers.
+- `build_router()`: factory returning a configured `SemanticRouter`.
+- `router`: a module-level router instance.
+
+The router is deterministic given a fixed embedding model. It routes to:
+1) FAQ
+2) SQL
+3) SMALL_TALK
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List
+
 from semantic_router import Route, SemanticRouter
 from semantic_router.encoders import HuggingFaceEncoder
 
-encoder = HuggingFaceEncoder(
-    name="sentence-transformers/all-MiniLM-L6-v2"
-)
 
-faq = Route(
-    name='faq',
-    utterances=[
-        "What is the return policy of the products?",
-        "Do I get discount with the HDFC credit card?",
-        "How can I track my order?",
-        "What payment methods are accepted?",
-        "How long does it take to process a refund?",
-    ]
-)
+@dataclass(frozen=True)
+class RouteName:
+    FAQ: str = "faq"
+    SQL: str = "sql"
+    SMALL_TALK: str = "small-talk"
 
-sql = Route(
-    name='sql',
-    utterances=[
-        "I want to buy nike shoes that have 50% discount.",
-        "Are there any shoes under Rs. 3000?",
-        "Do you have formal shoes in size 9?",
-        "Are there any Puma shoes on sale?",
-        "What is the price of puma running shoes?",
-    ]
-)
 
-small_talk = Route(
-    name='small-talk',
-    utterances=[
-        "How are you?",
-        "What is your name?",
-        "Are you a robot?",
-        "What are you?",
-        "What do you do?",
-    ]
-)
-routes = [faq, sql, small_talk]
-router = SemanticRouter(routes=routes, encoder=encoder,auto_sync="local")
+DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
+
+def build_router() -> SemanticRouter:
+    """
+    Create and return a configured `SemanticRouter` instance.
+
+    Returns
+    -------
+    SemanticRouter
+    """
+    encoder = HuggingFaceEncoder(name=DEFAULT_EMBEDDING_MODEL)
+
+    faq = Route(
+        name=RouteName.FAQ,
+        utterances=[
+            "What is the return policy of the products?",
+            "Do I get discount with the HDFC credit card?",
+            "How can I track my order?",
+            "What payment methods are accepted?",
+            "How long does it take to process a refund?",
+            "What is your policy on defective product?",
+        ],
+    )
+
+    sql = Route(
+        name=RouteName.SQL,
+        utterances=[
+            "I want to buy nike shoes that have 50% discount.",
+            "Are there any shoes under Rs. 3000?",
+            "Do you have formal shoes in size 9?",
+            "Are there any Puma shoes on sale?",
+            "What is the price of puma running shoes?",
+            "Pink Puma shoes in price range 5000 to 1000",
+        ],
+    )
+
+    small_talk = Route(
+        name=RouteName.SMALL_TALK,
+        utterances=[
+            "How are you?",
+            "What is your name?",
+            "Are you a robot?",
+            "What are you?",
+            "What do you do?",
+        ],
+    )
+
+    routes: List[Route] = [faq, sql, small_talk]
+    return SemanticRouter(routes=routes, encoder=encoder, auto_sync="local")
+
+#  Module-level instance (available to importers)
+router: SemanticRouter = build_router()
 
 if __name__ == "__main__":
+
     print(router("What is your policy on defective product?").name)
     print(router("Pink Puma shoes in price range 5000 to 1000").name)
     print(router("How are you?").name)
+
