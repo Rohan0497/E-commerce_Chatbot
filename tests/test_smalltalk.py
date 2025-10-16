@@ -1,5 +1,5 @@
 from app.smalltalk import talk
-from tests.conftest import DummyGroq
+from conftest import DummyGroq
 
 
 def test_smalltalk_uses_groq_mock():

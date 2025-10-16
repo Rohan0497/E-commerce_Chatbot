@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 from app import sql as sqlmod
-from tests.conftest import DummyGroq
+from conftest import DummyGroq
 
 
 def make_temp_db(tmp_path: Path) -> Path:

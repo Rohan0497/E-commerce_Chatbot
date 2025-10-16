@@ -2,7 +2,7 @@ import types
 
 from app.router import RouteName
 from app import router as routermod
-from main import ask
+from app.main import ask
 
 
 def test_ask_routes_to_handlers(monkeypatch):

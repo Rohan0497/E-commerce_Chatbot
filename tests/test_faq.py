@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 
 from app.faq import ingest_faq_data, get_relevant_qa, faq_chain, generate_answer
-from tests.conftest import DummyGroq
+from conftest import DummyGroq
 
 
 class DummyCollection:
