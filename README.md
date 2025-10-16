@@ -1,80 +1,29 @@
-# 💬 E-commerce Chatbot · GenAI RAG with Llama 3.3 + Groq
+# E-commerce Chatbot (Agentic Runtime)
 
-An intelligent e-commerce assistant that understands customer intent, answers FAQs,  
-and runs live product queries against your store database.  
-It uses a semantic router to classify queries, a RAG-style FAQ flow,  
-and an LLM-to-SQL flow for product search.  
-
-Built with Llama 3.3 via Groq, Streamlit, ChromaDB, SQLite, and Hugging Face embeddings.
-
-> Currently supports two intents: `faq` (policies, general info) and `sql` (product listings).  
-> Ships with a sample SQLite database and scraping utilities.
+An agentic assistant for e-commerce stores. The bot understands customer goals, answers policy questions, and performs live product lookups against your catalog with a plan/act/observe/reflect loop. It runs on Streamlit, Groq-hosted LLMs, ChromaDB for FAQs, and SQLite for product data.
 
 ---
 
-##  Features
-
--  **Semantic intent routing** → routes user messages to `faq` or `sql`
--  **FAQ (RAG)** → retrieves top FAQ entries from **ChromaDB** and answers strictly from that context
--  **LLM-to-SQL** → generates safe `SELECT` queries tagged with `<SQL>…</SQL>` and verbalizes tabular results
--  **Real-time data** → grounded in your **SQLite** product database
--  **Streamlit UI** → minimal chat interface to interact end-to-end
--  **Extensible** → add more routes (orders, returns) or switch databases easily
-
----
-
-Folder structure
-```
-E-commerce_Chatbot/
-├─ app/                          # Main chatbot package
-│  ├─ config.py                  # Env + constants
-│  ├─ router.py                  # Semantic router setup
-│  ├─ faq.py                     # FAQ RAG flow
-│  ├─ sql.py                     # SQL generation & answer
-│  ├─ smalltalk.py               # Small-talk handler
-│  └─ resources/
-│     └─ faq_data.csv
-│
-├─ tests/                        # Unit tests (pytest)
-├─ Scripts/                # Scripts / notebooks for product data
-├─ db.sqlite                     # Sample SQLite product DB
-├─ requirements.txt
-├─ README.md
-└─ LICENSE
-```
----
-
-This chatbot currently supports two intents:
-
-- **faq**: Triggered when users ask questions related to the platform's policies or general information. eg. Is online payment available?
-- **sql**: Activated when users request product listings or information based on real-time database queries. eg. Show me all nike shoes below Rs. 3000.
-
-
-![product screenshot](app/resources/product-ss.png)
+## Key Features
+- **Agentic tool loop** – The agent plans the task, calls one tool per step, retries intelligently, and returns responses with a trace of the tools used.
+- **FAQ retrieval (RAG)** – Top-k answers are pulled from a ChromaDB collection and the LLM responds strictly from that context.
+- **SQL product discovery** – Natural language is converted into whitelisted `SELECT` queries, executed against SQLite, and verbalized into user-friendly product lists.
+- **Session memory** – Preferred brands and budget ceilings are remembered per session via Streamlit state.
+- **Small-talk fallback** – Casual chit-chat still works through the existing Groq-backed small-talk handler.
+- **Guardrails & logging** – SQL statements are validated, `LIMIT` clauses are enforced automatically, and debug logging is in place for troubleshooting.
 
 ---
 
-## Architecture
+## Architecture Overview
 
-**Flow overview**
+1. **User query** enters through the Streamlit chat UI.
+2. **Router** identifies the intent (`small-talk`, `faq`, or `sql`). A keyword fallback is used if `semantic_router` is unavailable.
+3. **Agent loop** plans the steps, invokes one tool per step (FAQ, SQL, memory, web), observes the results, and decides whether to continue, refine, or stop.
+4. **Tools layer** (`app/tools/`) contains reusable wrappers for FAQ search/answering, SQL generation/execution/verbalization, memory access, and future web searches.
+5. **Data stores** – FAQ knowledge lives in ChromaDB; products live in SQLite. The agent never mutates these sources.
+6. **Response** – Final answers always end with `Trace: tool -> tool` so you can audit the path that was taken.
 
-1. **Streamlit UI** captures user query  
-2. **Semantic Router** (Hugging Face encoder) decides intent → `faq` or `sql`
-3. **FAQ path** → retrieve top-k context from ChromaDB → Groq LLM answers *only* from context  
-4. **SQL path** → Groq LLM emits `<SQL>…</SQL>` → extract → run `SELECT` on SQLite → Groq LLM summarizes results  
-5. **Response** is rendered back to the chat UI
-
-![architecture diagram of the e-commerce chatbot](app/resources/architecture-diagram.png)
-
-## Agentic Runtime Overview
-The Streamlit UI now delegates commerce questions to a lightweight agent loop:
-
-- Tools live in app/tools/ (FAQ, SQL, memory, web) and expose a shared ToolSpec signature.
-- Agent (app/agent.py) plans, executes one tool per step, records a trace, and retries SQL once when results are empty.
-- Session memory persists simple preferences (brand, price ceiling) via app/tools/memory.py.
-- When semantic_router is unavailable, app/router.py falls back to a keyword router so tests keep passing locally.
-
-Each agent answer ends with a Trace: ... line; see tests/test_agent.py for concrete expectations.
+![Product screenshot](app/resources/product-ss.png)
 
 ```mermaid
 flowchart LR
@@ -103,113 +52,97 @@ flowchart LR
     response --> ui
 ```
 
-### Set-up & Execution
-
-1. Run the following command to install all dependencies. 
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-1. Inside app folder, create a .env file with your GROQ credentials as follows:
-    ```text
-    GROQ_MODEL=<Add the model name, e.g. llama-3.3-70b-versatile>
-    GROQ_API_KEY=<Add your groq api key here>
-    ```
-
-1. Launch Streamlit from the project root (recommended):
-
-    ```bash
-    python -m streamlit run app/main.py
-    ```
-
-    The app also inserts the repository root into `sys.path`, so `streamlit run app/main.py` continues to work if you prefer that command.
-
 ---
 
-##  How It Works
+## Quick Start
 
-### 🔹 Router
-Uses a sentence-transformer encoder (`all-MiniLM-L6-v2`) to embed and route each query.
-
-### 🔹 FAQ Flow
-- Ingest your FAQ CSV → create a ChromaDB collection  
-- For a new query, retrieve top-K relevant FAQs  
-- Concatenate answers into a context window  
-- Ask the Groq LLM to generate an answer only from that context
-
-### 🔹 SQL Flow
-- Groq LLM produces a safe SQL query wrapped in `<SQL></SQL>`  
-- Only executes **SELECT** queries against the SQLite database  
-- The resulting dataframe is converted to natural-language output by another Groq call
-
----
-##  Testing
-
-Run all tests:
+### 1. Install dependencies
 ```bash
-pytest -q
+pip install -r requirements.txt
 ```
 
-- Unit tests cover routing, FAQ pipeline, SQL pipeline, and small-talk handler  
-- Tests use mocked Groq clients and temporary SQLite DBs
+### 2. Configure environment
+Create `app/.env` (or set real env vars) with:
+```text
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_API_KEY=<your groq api key>
+```
+
+### 3. Launch Streamlit (recommended command)
+```bash
+python -m streamlit run app/main.py
+```
+Running from the project root keeps the package import path intact. If you prefer `streamlit run app/main.py`, the entrypoint now inserts the repository root into `sys.path` automatically to support that workflow.
 
 ---
 
-##  Data & Scraping
+## How It Works
 
-- `db.sqlite` → sample product table  
-  Columns: `product_link`, `title`, `brand`, `price`, `discount`, `avg_rating`, `total_ratings`  
-- `web-scrapping/` → optional scripts or notebooks for collecting product data
+### Router
+- Default: `semantic_router` with `sentence-transformers/all-MiniLM-L6-v2` embeddings.
+- Fallback: keyword-based classifier if the dependency is missing (useful for simple local runs or CI).
+
+### FAQ Flow
+1. Questions are vectorized and matched against the ChromaDB FAQ collection.
+2. The top answers are stitched into a context window.
+3. Groq’s LLM answers strictly from the provided context, returning `"I don't know"` when missing.
+
+### SQL Flow
+1. Groq generates a query inside `<SQL>...</SQL>` tags using the allowed schema.
+2. The query is validated (SELECT-only, permitted columns/tables, `LIMIT 50` enforced).
+3. SQLite executes the statement and returns rows.
+4. The LLM verbalizes the results into the mandated product bullet format (`Title: Rs.<price> (<discount%> off), Rating: <avg_rating> <link>`).
+5. Empty results trigger one refinement attempt that relaxes constraints before stopping with “No matches.”
+
+### Memory
+- `memory_get` and `memory_set` read/write session preferences (brand, price ceiling). Streamlit session state is used in production; an in-memory dict backs tests.
+
+---
+
+## Testing
+Run the full suite:
+```bash
+pytest
+```
+Highlights:
+- `tests/test_agent.py` covers FAQ success, SQL success, refinement, guardrails, trace emission, and memory capture.
+- Router, FAQ, SQL, and small-talk modules retain their legacy unit tests.
+- Dummy Groq clients ensure deterministic outputs without external calls.
+
+---
+
+## Data & Assets
+- `app/db.sqlite` – sample `product` table with link, title, brand, price, discount, and rating columns.
+- `app/resources/faq_data.csv` – seed FAQ data for ingestion.
+- Optional scraping utilities live under `Scripts/`.
 
 ---
 
 ## Tech Stack
-
-- LLM: Llama 3.3 via Groq API  
-- UI: Streamlit  
-- Routing: semantic-router + Hugging Face encoder  
-- Vector DB: ChromaDB  
-- SQL DB: SQLite  
-- Language: Python 3.10+
-
----
-
-## Safety & Constraints
-
-- Guardrail: only **SELECT** statements are executed against the database  
-- FAQ answers are limited to retrieved context; if unknown → “I don’t know”
+- **Language**: Python 3.11+
+- **UI**: Streamlit
+- **LLM**: Groq (Llama 3.3 variants)
+- **Vector store**: ChromaDB
+- **Database**: SQLite
+- **Routing**: semantic-router (with keyword fallback)
+- **Testing**: pytest
 
 ---
 
-## Roadmap
-
-- Add order status and returns intents  
-- Introduce user sessions / chat memory  
-- Migrate SQLite → PostgreSQL  
-- Add evaluation harness for LLM→SQL accuracy  
-- Integrate vector product search (ChromaDB)  
-- Deploy demo (Streamlit Cloud)
-<!-- - Dockerfile + GitHub Actions CI/CD   -->
+## Safety & Guardrails
+- SQL execution is read-only and constrained to the whitelisted `product` table/columns.
+- Every automatically generated query receives a `LIMIT 50` to avoid runaway result sets.
+- FAQ answers are confined to retrieved context; unknown answers explicitly return “I don't know.”
+- Agent responses always include a trace line so tool usage is transparent.
 
 ---
 
-## Credits
-
-  
-Inspired by community implementations and tutorials (Codebasics series)
+## Development Tips
+- When adding new tools, register them in `app/tools/__init__.py` and include a typed wrapper like the existing ones.
+- Extend tests alongside new behavior; agent regression coverage is highly encouraged.
+- If you install `semantic_router`, ensure the required embedding model downloads at runtime (may need network access).
 
 ---
 
 ## License
-
-Apache 2.0 — see LICENSE.
-
-
----
-
-##  Appendix — FAQ CSV Format
-
-- question,answer
-- What is your return policy?,You can return any item within 30 days of delivery if it's in original condition.
-- Do you offer Cash on Delivery?,Yes, COD is available at checkout in select locations.
+Apache License 2.0 – see `LICENSE`.
