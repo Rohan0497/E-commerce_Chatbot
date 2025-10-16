@@ -209,3 +209,4 @@ __marimo__/
 # ignore the sqlite db and sidecar files
 app/db.sqlite
 
+todo.md
