@@ -6,3 +6,4 @@ groq
 semantic-router[local]
 chromadb
 sentence_transformers
+pytest
