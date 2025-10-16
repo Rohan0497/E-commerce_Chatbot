@@ -24,7 +24,7 @@ Built with Llama 3.3 via Groq, Streamlit, ChromaDB, SQLite, and Hugging Face emb
 ---
 
 Folder structure
-
+```
 E-commerce_Chatbot/
 ├─ app/                          # Main chatbot package
 │  ├─ config.py                  # Env + constants
@@ -41,7 +41,7 @@ E-commerce_Chatbot/
 ├─ requirements.txt
 ├─ README.md
 └─ LICENSE
-
+```
 ---
 
 This chatbot currently supports two intents:
@@ -72,7 +72,7 @@ This chatbot currently supports two intents:
 1. Run the following command to install all dependencies. 
 
     ```bash
-    pip install -r app/requirements.txt
+    pip install -r requirements.txt
     ```
 
 1. Inside app folder, create a .env file with your GROQ credentials as follows:
@@ -150,9 +150,9 @@ pytest -q
 - Introduce user sessions / chat memory  
 - Migrate SQLite → PostgreSQL  
 - Add evaluation harness for LLM→SQL accuracy  
-- Integrate vector product search (Qdrant / Pinecone)  
+- Integrate vector product search (ChromaDB)  
+- Deploy demo (Streamlit Cloud)
 <!-- - Dockerfile + GitHub Actions CI/CD   -->
-- Deploy demo (Streamlit Cloud / Fly.io)
 
 ---
 
