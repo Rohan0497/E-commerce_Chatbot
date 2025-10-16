@@ -12,11 +12,11 @@ from __future__ import annotations
 import logging
 import streamlit as st
 
-from app.router import router, RouteName
-from app.faq import ingest_faq_data, faq_chain
-from app.sql import sql_chain
-from app.smalltalk import talk
-from app.config import FAQ_CSV_PATH
+from router import router, RouteName
+from faq import ingest_faq_data, faq_chain
+from sql import sql_chain
+from smalltalk import talk
+from config import FAQ_CSV_PATH
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
