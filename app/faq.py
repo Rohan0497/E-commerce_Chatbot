@@ -9,7 +9,7 @@ Design
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 import chromadb
 import pandas as pd
@@ -17,10 +17,11 @@ from dotenv import load_dotenv
 from groq import Groq
 
 from app.config import FAQ_CSV_PATH, GROQ_MODEL_ENV, require_env
+from app.tools import faq_tool
 
 load_dotenv()
 
-COLLECTION_NAME = "faqs"
+COLLECTION_NAME = faq_tool.COLLECTION_NAME
 
 
 def _client() -> Groq:
@@ -63,10 +64,9 @@ def get_relevant_qa(query: str, client: Optional[chromadb.Client] = None, n_resu
     Dict
         Chroma-like query result with top-k metadatas.
     """
-    if client is None:
-        client = chromadb.Client()
-    collection = client.get_collection(name=COLLECTION_NAME)
-    return collection.query(query_texts=[query], n_results=n_results)
+    items = faq_tool.faq_search(query, k=n_results, client=client)["items"]
+    metadatas = [{"answer": item.get("answer", "")} for item in items]
+    return {"metadatas": [metadatas]}
 
 
 def generate_answer(query: str, context: str, client: Optional[Groq] = None, model: Optional[str] = None) -> str:
@@ -78,22 +78,14 @@ def generate_answer(query: str, context: str, client: Optional[Groq] = None, mod
     str
         LLM response (or "I don't know" when not in context).
     """
-    if client is None:
-        client = _client()
-    if model is None:
-        model = require_env(GROQ_MODEL_ENV)
-
-    prompt = (
-        "Given the following context and question, generate an answer based on this context only.\n"
-        "If the answer is not found in the context, state: I don't know.\n\n"
-        f"Question: {query}\n"
-        f"Context: {context}\n"
+    context_items: List[Dict[str, Any]] = [{"answer": context}]
+    result = faq_tool.faq_answer(
+        question=query,
+        context=context_items,
+        model=model or require_env(GROQ_MODEL_ENV),
+        client=client or _client(),
     )
-    completion = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return completion.choices[0].message.content  # type: ignore[no-any-return]
+    return result["text"]
 
 
 def faq_chain(
@@ -110,7 +102,12 @@ def faq_chain(
     - Concatenate the 'answer' fields of the top-k entries into a single context blob.
     - Ask LLM to answer strictly from that context.
     """
-    result = get_relevant_qa(query, client=chroma_client)
-    # Concatenate answers from top-k matched questions to form context.
-    context = " ".join([r.get("answer", "") for r in result["metadatas"][0]])
-    return generate_answer(query, context, client=groq_client, model=model)
+    search = faq_tool.faq_search(query, k=2, client=chroma_client)
+    context_items = [{"answer": item.get("answer", "")} for item in search["items"]]
+    answer = faq_tool.faq_answer(
+        question=query,
+        context=context_items,
+        model=model or require_env(GROQ_MODEL_ENV),
+        client=groq_client or _client(),
+    )
+    return answer["text"]

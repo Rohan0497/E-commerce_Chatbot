@@ -1,4 +1,6 @@
 import types
+from typing import Any, Dict, List
+
 import pytest
 import sys
 from pathlib import Path
@@ -31,6 +33,29 @@ class DummyGroq:
 
     def _create(self, **kwargs):
         return DummyCompletion(self._content)
+
+
+class DummySQLTool:
+    """Deterministic SQL tool behavior for agent-focused tests."""
+
+    def __init__(self):
+        self.last_query = ""
+        self.rows: List[Dict[str, Any]] = []
+        self.columns: List[str] = []
+        self.raise_non_select = False
+
+    def sql_generate(self, args: Dict[str, Any]) -> Dict[str, str]:
+        return {"sql_wrapped": "<SQL>SELECT * FROM product;</SQL>"}
+
+    def sql_run(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        sql = args["sql"]
+        self.last_query = sql
+        if self.raise_non_select:
+            raise ValueError("Only SELECT statements are allowed.")
+        return {"rows": self.rows, "columns": self.columns}
+
+    def verbalize(self, args: Dict[str, Any]) -> Dict[str, str]:
+        return {"text": "verbalized"}
 
 
 @pytest.fixture(autouse=True)

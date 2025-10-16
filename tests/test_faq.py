@@ -20,7 +20,9 @@ class DummyCollection:
     def query(self, query_texts, n_results=2):
         # Return first n_results entries deterministically
         metas = self.metadatas[:n_results]
-        return {"metadatas": [metas]}
+        docs = self.docs[:n_results]
+        distances = [0.0 for _ in docs]
+        return {"metadatas": [metas], "documents": [docs], "distances": [distances]}
 
 
 class DummyClient:

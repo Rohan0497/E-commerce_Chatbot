@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 from groq import Groq
 
 from app.config import DB_PATH, GROQ_MODEL_ENV, require_env
+from app.tools import sql_tool
 
 load_dotenv()
 
@@ -78,21 +79,12 @@ def generate_sql_query(question: str, client: Optional[Groq] = None, model: Opti
     str
         Raw LLM message content (expected to include <SQL>...</SQL>).
     """
-    if client is None:
-        client = _client()
-    if model is None:
-        model = require_env(GROQ_MODEL_ENV)
-
-    chat_completion = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SQL_SYSTEM_PROMPT},
-            {"role": "user", "content": question},
-        ],
-        temperature=0.2,
-        max_tokens=1024,
+    result = sql_tool.sql_generate(
+        question,
+        model=model or require_env(GROQ_MODEL_ENV),
+        client=client or _client(),
     )
-    return chat_completion.choices[0].message.content  # type: ignore[no-any-return]
+    return result["sql_wrapped"]
 
 
 def _extract_sql_tagged(text: str) -> Optional[str]:
@@ -124,11 +116,16 @@ def run_query(sql: str, db_path=DB_PATH) -> Optional[pd.DataFrame]:
     Optional[pd.DataFrame]
         Query results if SELECT, else None.
     """
-    if not sql.strip().upper().startswith("SELECT"):
+    try:
+        result = sql_tool.sql_run(sql, db_path=db_path)
+    except ValueError:
         return None
-    with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql_query(sql, conn)
-    return df
+
+    rows = result["rows"]
+    columns = result["columns"]
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    return pd.DataFrame(rows, columns=columns)
 
 
 def data_comprehension(
@@ -145,20 +142,13 @@ def data_comprehension(
     str
         Natural language answer that reflects the provided data.
     """
-    if client is None:
-        client = _client()
-    if model is None:
-        model = require_env(GROQ_MODEL_ENV)
-
-    completion = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": COMPREHENSION_SYSTEM_PROMPT},
-            {"role": "user", "content": f"QUESTION: {question}\nDATA: {context}"},
-        ],
-        temperature=0.2,
+    result = sql_tool.verbalize(
+        question,
+        list(context),
+        model=model or require_env(GROQ_MODEL_ENV),
+        client=client or _client(),
     )
-    return completion.choices[0].message.content  # type: ignore[no-any-return]
+    return result["text"]
 
 
 def sql_chain(

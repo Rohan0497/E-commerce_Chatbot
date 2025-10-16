@@ -15,10 +15,16 @@ The router is deterministic given a fixed embedding model. It routes to:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
+import types
+from typing import List, Sequence
 
-from semantic_router import Route, SemanticRouter
-from semantic_router.encoders import HuggingFaceEncoder
+try:  # pragma: no cover - optional dependency
+    from semantic_router import Route, SemanticRouter
+    from semantic_router.encoders import HuggingFaceEncoder
+except ImportError:  # pragma: no cover - fallback path exercised in tests
+    Route = None  # type: ignore[assignment]
+    SemanticRouter = None  # type: ignore[misc]
+    HuggingFaceEncoder = None  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)
@@ -31,7 +37,44 @@ class RouteName:
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
-def build_router() -> SemanticRouter:
+def _keyword_router():
+    faq_terms = {"policy", "refund", "return", "shipping", "payment", "warranty", "order"}
+    sql_terms = {
+        "shoe",
+        "shoes",
+        "price",
+        "cost",
+        "discount",
+        "brand",
+        "rating",
+        "size",
+        "list",
+        "show",
+        "buy",
+        "product",
+        "puma",
+        "nike",
+    }
+
+    class KeywordRouter:
+        def __call__(self, query: str):
+            lowered = query.lower()
+            if _contains(lowered, faq_terms):
+                name = RouteName.FAQ
+            elif _contains(lowered, sql_terms):
+                name = RouteName.SQL
+            else:
+                name = RouteName.SMALL_TALK
+            return types.SimpleNamespace(name=name)
+
+    return KeywordRouter()
+
+
+def _contains(text: str, needles: Sequence[str]) -> bool:
+    return any(term in text for term in needles)
+
+
+def build_router():
     """
     Create and return a configured `SemanticRouter` instance.
 
@@ -39,6 +82,9 @@ def build_router() -> SemanticRouter:
     -------
     SemanticRouter
     """
+    if SemanticRouter is None or HuggingFaceEncoder is None or Route is None:
+        return _keyword_router()
+
     encoder = HuggingFaceEncoder(name=DEFAULT_EMBEDDING_MODEL)
 
     faq = Route(
@@ -79,8 +125,9 @@ def build_router() -> SemanticRouter:
     routes: List[Route] = [faq, sql, small_talk]
     return SemanticRouter(routes=routes, encoder=encoder, auto_sync="local")
 
+
 #  Module-level instance (available to importers)
-router: SemanticRouter = build_router()
+router = build_router()
 
 if __name__ == "__main__":
 

@@ -66,6 +66,42 @@ This chatbot currently supports two intents:
 
 ![architecture diagram of the e-commerce chatbot](app/resources/architecture-diagram.png)
 
+## Agentic Runtime Overview
+The Streamlit UI now delegates commerce questions to a lightweight agent loop:
+
+- Tools live in app/tools/ (FAQ, SQL, memory, web) and expose a shared ToolSpec signature.
+- Agent (app/agent.py) plans, executes one tool per step, records a trace, and retries SQL once when results are empty.
+- Session memory persists simple preferences (brand, price ceiling) via app/tools/memory.py.
+- When semantic_router is unavailable, app/router.py falls back to a keyword router so tests keep passing locally.
+
+Each agent answer ends with a Trace: ... line; see tests/test_agent.py for concrete expectations.
+
+```mermaid
+flowchart LR
+    user([User Query]) --> ui[Streamlit Chat UI]
+    ui --> router{Intent Router}
+    router -->|Small talk| smalltalk[talk() helper]
+    router -->|Commerce| agent[Agent Loop]
+
+    subgraph Agent Loop
+        agent --> plan[Plan + Memory Hints]
+        plan --> act{Select Tool}
+        act -->|FAQ| faq_tools[faq_search / faq_answer]
+        act -->|Products| sql_tools[sql_generate / sql_run / verbalize]
+        act -->|Web| web_tool[web_search (stub)]
+        act --> memory_tools[memory_get / memory_set]
+    end
+
+    faq_tools --> chroma[(Chroma FAQ Store)]
+    sql_tools --> db[(SQLite Product DB)]
+    sql_tools -->|Results| agent
+    memory_tools --> agent
+    agent --> response[Final Answer + Trace]
+    smalltalk --> response
+    chroma --> agent
+
+    response --> ui
+```
 
 ### Set-up & Execution
 
@@ -81,11 +117,13 @@ This chatbot currently supports two intents:
     GROQ_API_KEY=<Add your groq api key here>
     ```
 
-1. Run the streamlit app by running the following command.
+1. Launch Streamlit from the project root (recommended):
 
     ```bash
-    streamlit run app/main.py
+    python -m streamlit run app/main.py
     ```
+
+    The app also inserts the repository root into `sys.path`, so `streamlit run app/main.py` continues to work if you prefer that command.
 
 ---
 
