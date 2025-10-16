@@ -37,7 +37,7 @@ flowchart LR
         plan --> act{Select Tool}
         act -->|FAQ| faq_tools[faq_search / faq_answer]
         act -->|Products| sql_tools[sql_generate / sql_run / verbalize]
-        act -->|Web| web_tool[web_search (stub)]
+        act -->|Web| web_tool[web search stub]
         act --> memory_tools[memory_get / memory_set]
     end
 
