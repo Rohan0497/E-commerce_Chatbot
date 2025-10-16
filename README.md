@@ -172,6 +172,6 @@ Apache 2.0 — see LICENSE.
 
 ##  Appendix — FAQ CSV Format
 
-question,answer
-What is your return policy?,You can return any item within 30 days of delivery if it's in original condition.
-Do you offer Cash on Delivery?,Yes, COD is available at checkout in select locations.
+- question,answer
+- What is your return policy?,You can return any item within 30 days of delivery if it's in original condition.
+- Do you offer Cash on Delivery?,Yes, COD is available at checkout in select locations.
