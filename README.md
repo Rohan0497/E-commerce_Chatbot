@@ -36,7 +36,7 @@ E-commerce_Chatbot/
 │     └─ faq_data.csv
 │
 ├─ tests/                        # Unit tests (pytest)
-├─ web-scrapping/                # Scripts / notebooks for product data
+├─ Scripts/                # Scripts / notebooks for product data
 ├─ db.sqlite                     # Sample SQLite product DB
 ├─ requirements.txt
 ├─ README.md
