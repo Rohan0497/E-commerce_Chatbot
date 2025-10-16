@@ -16,7 +16,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from groq import Groq
 
-from config import FAQ_CSV_PATH, GROQ_MODEL_ENV, require_env
+from app.config import FAQ_CSV_PATH, GROQ_MODEL_ENV, require_env
 
 load_dotenv()
 

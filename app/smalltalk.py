@@ -11,7 +11,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from groq import Groq
 
-from config import GROQ_MODEL_ENV, require_env
+from app.config import GROQ_MODEL_ENV, require_env
 
 # Load env early so tests and runtime share behavior
 load_dotenv()
