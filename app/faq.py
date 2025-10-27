@@ -16,6 +16,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from groq import Groq
 
+from app.chroma_utils import get_chroma_client
 from app.config import FAQ_CSV_PATH, GROQ_MODEL_ENV, require_env
 from app.tools import faq_tool
 
@@ -29,7 +30,7 @@ def _client() -> Groq:
     return Groq()
 
 
-def ingest_faq_data(path: Path, client: Optional[chromadb.Client] = None) -> None:
+def ingest_faq_data(path: Path, client: Optional[Any] = None) -> None:
     """
     Load FAQ CSV into ChromaDB (idempotent).
 
@@ -41,13 +42,17 @@ def ingest_faq_data(path: Path, client: Optional[chromadb.Client] = None) -> Non
         Injected Chroma client for testability.
     """
     if client is None:
-        client = chromadb.Client()
-
-    existing = [c.name for c in client.list_collections()]
-    if COLLECTION_NAME in existing:
-        return  # Skip: already exists
+        client = get_chroma_client()
 
     collection = client.get_or_create_collection(name=COLLECTION_NAME)
+    if hasattr(collection, "count"):
+        try:
+            if collection.count() > 0:
+                return
+        except Exception:
+            # If the underlying client does not support count or raises, fall back to ingestion.
+            pass
+
     df = pd.read_csv(path)
     docs = df["question"].astype(str).tolist()
     metadata = [{"answer": ans} for ans in df["answer"].astype(str).tolist()]

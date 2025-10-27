@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 import chromadb
 from groq import Groq
 
+from app.chroma_utils import get_chroma_client
 from app.config import GROQ_MODEL_ENV, require_env
 
 COLLECTION_NAME = "faqs"
@@ -16,7 +17,7 @@ def _build_chroma(client: Optional[chromadb.Client]) -> chromadb.Client:
     """Return a Chroma client, building one if not injected."""
     if client is not None:
         return client
-    return chromadb.Client()
+    return get_chroma_client()
 
 
 def _build_groq(client: Optional[Groq]) -> Groq:

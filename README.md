@@ -1,29 +1,17 @@
 # E-commerce Chatbot (Agentic Runtime)
 
-An agentic assistant for e-commerce stores. The bot understands customer goals, answers policy questions, and performs live product lookups against your catalog with a plan/act/observe/reflect loop. It runs on Streamlit, Groq-hosted LLMs, ChromaDB for FAQs, and SQLite for product data.
+An agentic assistant for e-commerce stores. The bot understands customer questions, answers store policies from an FAQ knowledge base, and performs live product lookups against an SQLite catalog using a plan → act → observe → reflect loop. It ships with a Streamlit chat UI for demos and can be embedded behind the FastAPI service in `services/api`.
 
 ---
 
-## Key Features
-- **Agentic tool loop** – The agent plans the task, calls one tool per step, retries intelligently, and returns responses with a trace of the tools used.
-- **FAQ retrieval (RAG)** – Top-k answers are pulled from a ChromaDB collection and the LLM responds strictly from that context.
-- **SQL product discovery** – Natural language is converted into whitelisted `SELECT` queries, executed against SQLite, and verbalized into user-friendly product lists.
-- **Session memory** – Preferred brands and budget ceilings are remembered per session via Streamlit state.
-- **Small-talk fallback** – Casual chit-chat still works through the existing Groq-backed small-talk handler.
-- **Guardrails & logging** – SQL statements are validated, `LIMIT` clauses are enforced automatically, and debug logging is in place for troubleshooting.
+## 1. What You Get
+- **Agentic workflow** – The agent plans a short tool sequence, executes one tool per step, retries once on empty results, and gathers a trace so you can audit actions.
+- **FAQ retrieval (RAG)** – Top-k answers are fetched from a Chroma collection created from `app/resources/faq_data.csv`.
+- **Product discovery** – Natural-language requests are translated into guarded SQL `SELECT` queries, executed against SQLite, and verbalized into a product list.
+- **Session memory** – Preferred brands and price ceilings are remembered per conversation (Streamlit session or Redis via the API service).
+- **Guardrails** – SQL is read-only with `LIMIT 50`, FAQ answers stay within context, Groq calls have timeouts/retries, and rate limiting is available in the API.
 
----
-
-## Architecture Overview
-
-1. **User query** enters through the Streamlit chat UI.
-2. **Router** identifies the intent (`small-talk`, `faq`, or `sql`). A keyword fallback is used if `semantic_router` is unavailable.
-3. **Agent loop** plans the steps, invokes one tool per step (FAQ, SQL, memory, web), observes the results, and decides whether to continue, refine, or stop.
-4. **Tools layer** (`app/tools/`) contains reusable wrappers for FAQ search/answering, SQL generation/execution/verbalization, memory access, and future web searches.
-5. **Data stores** – FAQ knowledge lives in ChromaDB; products live in SQLite. The agent never mutates these sources.
-6. **Response** – Final answers always end with `Trace: tool -> tool` so you can audit the path that was taken.
-
-![Product screenshot](app/resources/product-ss.png)
+![Screenshot](app/resources/product-ss.png)
 
 ```mermaid
 flowchart LR
@@ -43,9 +31,9 @@ flowchart LR
 
     faq_tools --> chroma[(Chroma FAQ Store)]
     sql_tools --> db[(SQLite Product DB)]
-    sql_tools -->|Results| agent
+    sql_tools -->|Rows| agent
     memory_tools --> agent
-    agent --> response[Final Answer + Trace]
+    agent --> response[Assistant Reply]
     smalltalk --> response
     chroma --> agent
 
@@ -54,95 +42,127 @@ flowchart LR
 
 ---
 
-## Quick Start
+## 2. Quick Start (Local Demo)
 
-### 1. Install dependencies
 ```bash
+git clone <your fork or repo url>
+cd E-commerce_Chatbot
+python -m venv .venv
+.venv\Scripts\activate        # on macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure environment
-Create `app/.env` (or set real env vars) with:
+### Configure environment variables
+
+You can set variables in a shell or a `.env` file (loaded automatically):
+
 ```text
-GROQ_MODEL=llama-3.3-70b-versatile
-GROQ_API_KEY=<your groq api key>
+GROQ_API_KEY=<your groq key>        # required for LLM calls
+GROQ_MODEL=llama-3.3-70b-versatile  # or another Groq chat model
+DB_PATH=app/db.sqlite               # optional override for the SQLite file
+CHROMA_PATH=.chroma                 # optional: persistent FAQ embeddings
 ```
 
-### 3. Launch Streamlit (recommended command)
+### Seed the product catalog
+
+```bash
+python scripts/init_db.py
+```
+
+This script creates the `product` table (if needed), wipes existing rows, and loads the seed data from `app/resources/ecommerce_data_final.csv`. It respects `DB_PATH`, so you can run:
+
+```bash
+python scripts/init_db.py --db-path ./data/catalog.db
+```
+
+### Run the Streamlit UI
+
 ```bash
 python -m streamlit run app/main.py
 ```
-Running from the project root keeps the package import path intact. If you prefer `streamlit run app/main.py`, the entrypoint now inserts the repository root into `sys.path` automatically to support that workflow.
+
+Open the provided URL (default http://localhost:8501) and start chatting.
 
 ---
 
-## How It Works
+## 3. Optional FastAPI Service
 
-### Router
-- Default: `semantic_router` with `sentence-transformers/all-MiniLM-L6-v2` embeddings.
-- Fallback: keyword-based classifier if the dependency is missing (useful for simple local runs or CI).
+For production scenarios use the API service (includes rate limiting, Prometheus metrics, tracing hooks, and Redis-backed memory):
 
-### FAQ Flow
-1. Questions are vectorized and matched against the ChromaDB FAQ collection.
-2. The top answers are stitched into a context window.
-3. Groq’s LLM answers strictly from the provided context, returning `"I don't know"` when missing.
+```bash
+python -m uvicorn services.api.server:app --reload
+```
 
-### SQL Flow
-1. Groq generates a query inside `<SQL>...</SQL>` tags using the allowed schema.
-2. The query is validated (SELECT-only, permitted columns/tables, `LIMIT 50` enforced).
-3. SQLite executes the statement and returns rows.
-4. The LLM verbalizes the results into the mandated product bullet format (`Title: Rs.<price> (<discount%> off), Rating: <avg_rating> <link>`).
-5. Empty results trigger one refinement attempt that relaxes constraints before stopping with “No matches.”
+Endpoints:
+- `POST /v1/ask` `{ "query": "..." }`
+- `GET /healthz`, `GET /readyz`, `GET /metrics`
 
-### Memory
-- `memory_get` and `memory_set` read/write session preferences (brand, price ceiling). Streamlit session state is used in production; an in-memory dict backs tests.
+Set `API_BASE_URL` when running Streamlit to proxy queries through the service instead of in-process tools.
 
 ---
 
-## Testing
-Run the full suite:
+## 4. Sample Queries
+
+Once the app is running, try these to validate behaviour:
+
+- **Product lookup:** `Show Puma running shoes under 3000 sorted by rating.`  
+  Expect a bullet list with title, price, discount percent, rating, and product link.
+
+- **Policy / FAQ:** `What is your return policy?`  
+  Uses Chroma FAQ data and replies with the matching policy text.
+
+- **Small talk:** `Hi there, who are you?`  
+  Streamlit small-talk helper responds without touching the catalog.
+
+If you ask for a brand or price the agent cannot satisfy, it will request clarifications (e.g., “Could you share the preferred brand and budget ceiling you're looking for?”).
+
+---
+
+## 5. Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `Sorry, something went wrong: no such table: product` | Run `python scripts/init_db.py` (and confirm `DB_PATH` points to the database you seeded). |
+| `An instance of Chroma already exists for ephemeral with different settings` | Configure `CHROMA_PATH` so every process uses the same persistent directory, or clear `~/.cache/chroma`. Latest code defaults to a single cached client per process. |
+| API returns `429` | Rate limit hit. Increase `RATE_LIMIT_PER_MINUTE` or disable by unsetting it. |
+| Responses show “I don't know.” | FAQ context did not match the query. Add the question/answer to `app/resources/faq_data.csv` and rerun the app (ingestion is idempotent). |
+
+---
+
+## 6. Testing and Validation
+
 ```bash
 pytest
 ```
+
 Highlights:
-- `tests/test_agent.py` covers FAQ success, SQL success, refinement, guardrails, trace emission, and memory capture.
-- Router, FAQ, SQL, and small-talk modules retain their legacy unit tests.
-- Dummy Groq clients ensure deterministic outputs without external calls.
+- `tests/test_agent.py` – covers FAQ success, SQL success, refinement behaviour, guardrails, trace bookkeeping, and memory capture.
+- `tests/test_sql.py` – validates SQL extraction, whitelist enforcement, and chain orchestration.
+- API smoke tests live in `tests/test_api_smoke.py` (ensures `/v1/ask` and health endpoints respond).
+
+The test suite uses dummy Groq clients, so no network requests are made.
 
 ---
 
-## Data & Assets
-- `app/db.sqlite` – sample `product` table with link, title, brand, price, discount, and rating columns.
-- `app/resources/faq_data.csv` – seed FAQ data for ingestion.
-- Optional scraping utilities live under `Scripts/`.
+## 7. Project Layout
+
+```
+app/
+  agent.py              # agent loop
+  main.py               # Streamlit entry point
+  sql.py / faq.py       # product + FAQ toolchains
+  resources/            # FAQ CSV, seed data, images
+  tools/                # individual tool wrappers
+scripts/
+  init_db.py            # create/seed SQLite product table
+services/api/           # FastAPI production service
+tests/                  # pytest suite
+```
+
+Run `scripts/init_db.py` whenever you refresh product data. The Chroma FAQ store is (re)ingested automatically on startup.
 
 ---
 
-## Tech Stack
-- **Language**: Python 3.11+
-- **UI**: Streamlit
-- **LLM**: Groq (Llama 3.3 variants)
-- **Vector store**: ChromaDB
-- **Database**: SQLite
-- **Routing**: semantic-router (with keyword fallback)
-- **Testing**: pytest
+## 8. License
 
----
-
-## Safety & Guardrails
-- SQL execution is read-only and constrained to the whitelisted `product` table/columns.
-- Every automatically generated query receives a `LIMIT 50` to avoid runaway result sets.
-- FAQ answers are confined to retrieved context; unknown answers explicitly return “I don't know.”
-- Agent responses always include a trace line so tool usage is transparent.
-
----
-
-## Development Tips
-- When adding new tools, register them in `app/tools/__init__.py` and include a typed wrapper like the existing ones.
-- Extend tests alongside new behavior; agent regression coverage is highly encouraged.
-- If you install `semantic_router`, ensure the required embedding model downloads at runtime (may need network access).
-
----
-
-## License
-Apache License 2.0 – see `LICENSE`.
+Apache License 2.0 (see `LICENSE`).

@@ -9,7 +9,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from groq import Groq
 
-from app.config import DB_PATH, GROQ_MODEL_ENV, require_env
+from app.config import GROQ_MODEL_ENV, require_env, get_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +181,7 @@ def _run_sql(sql: str, db_path: str) -> tuple[List[sqlite3.Row], List[str]]:
 def sql_run(
     sql: str,
     *,
-    db_path: str = DB_PATH,
+    db_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Execute a validated SELECT query and return rows/columns.
@@ -195,7 +195,8 @@ def sql_run(
     limited_sql = _ensure_limit(sql)
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("Executing SQL (with guards applied): %s", limited_sql)
-    rows, columns = _run_sql(limited_sql, db_path)
+    resolved_path = db_path or str(get_db_path())
+    rows, columns = _run_sql(limited_sql, resolved_path)
     records = [dict(row) for row in rows]
     return {"rows": records, "columns": columns}
 

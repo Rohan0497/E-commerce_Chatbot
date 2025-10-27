@@ -125,7 +125,9 @@ def ask(query: str) -> str:
     if _needs_small_talk(query):
         st.session_state.pop("agent_pending_clarification", None)
         response = talk(query)
-        return f"{response}\nTrace: small_talk"
+        st.session_state["agent_last_trace"] = [{"tool": "small_talk", "args": {}, "ok": True}]
+        st.session_state["agent_last_trace_line"] = "Trace: small_talk"
+        return response
 
     agent = _get_agent()
     memory_snapshot = _load_memory()
@@ -140,6 +142,7 @@ def ask(query: str) -> str:
 
     # Optionally stash last trace for debugging or future UI features
     st.session_state["agent_last_trace"] = result.get("trace", [])
+    st.session_state["agent_last_trace_line"] = result.get("trace_line")
 
     return result["text"]
 

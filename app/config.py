@@ -21,7 +21,7 @@ GROQ_MODEL_ENV = "GROQ_MODEL"
 #: Default embedding model for the router.
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
-#: Path to the SQLite database file (can be overridden in tests).
+#: Bundled SQLite database path (can be overridden by DB_PATH env var).
 DB_PATH = Path(__file__).resolve().parent / "db.sqlite"
 
 #: Path to the FAQ CSV.
@@ -51,3 +51,18 @@ def get_groq_api_key() -> str:
     Convenience accessor specifically for the Groq API key.
     """
     return require_env(GROQ_API_KEY_ENV)
+
+
+def get_db_path() -> Path:
+    """
+    Resolve the SQLite database path honoring the DB_PATH environment override.
+
+    Returns
+    -------
+    Path
+        Absolute or relative path where the SQLite product database should live.
+    """
+    override = os.getenv("DB_PATH")
+    if override:
+        return Path(override).expanduser()
+    return DB_PATH

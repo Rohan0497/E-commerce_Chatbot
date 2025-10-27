@@ -305,12 +305,10 @@ class Agent:
         if not text:
             text = "I don't have an answer right now."
 
-        trace_line = self._format_trace(tool_order)
-        final_text = f"{text}\n{trace_line}"
-
         return {
-            "text": final_text,
+            "text": text,
             "trace": trace_records,
+            "trace_line": self._format_trace(tool_order),
             "plan": plan,
             "goal": user_goal,
             "memory_updates": data.get("memory_updates", {}),

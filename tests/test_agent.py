@@ -41,8 +41,8 @@ def test_agent_faq_happy_path():
     agent = make_agent({"faq_search": faq_search, "faq_answer": faq_answer})
     result = agent.run("Return policy?", memory={})
 
-    assert result["text"].splitlines()[0] == "You can return items within 30 days."
-    assert result["text"].endswith("Trace: faq_search -> faq_answer")
+    assert result["text"] == "You can return items within 30 days."
+    assert result["trace_line"] == "Trace: faq_search -> faq_answer"
     assert [entry["tool"] for entry in result["trace"]] == ["faq_search", "faq_answer"]
     assert all(entry["ok"] for entry in result["trace"])
 
@@ -63,11 +63,11 @@ def test_agent_sql_no_rows_then_refine():
     query = "Puma running shoes under 3000 sorted by rating."
     result = agent.run(query, memory={})
 
-    assert result["text"].splitlines()[0] == "No matches."
+    assert result["text"] == "No matches."
     assert generate_calls[0] == query
     assert "relax filters" in generate_calls[1]
     assert len(run_calls) == 2
-    assert result["text"].endswith("Trace: sql_generate -> sql_run -> sql_generate -> sql_run")
+    assert result["trace_line"] == "Trace: sql_generate -> sql_run -> sql_generate -> sql_run"
 
 
 def test_agent_blocks_non_select():
@@ -110,8 +110,8 @@ def test_agent_trace_emitted_for_sql_success():
     result = agent.run("Puma running shoes under 3000 sorted by rating.", memory={})
 
     expected_line = "Velocity Runner: Rs.2999 (50% off), Rating: 4.9 http://x/1"
-    assert result["text"].splitlines()[0] == expected_line
-    assert result["text"].endswith("Trace: sql_generate -> sql_run -> verbalize")
+    assert result["text"] == expected_line
+    assert result["trace_line"] == "Trace: sql_generate -> sql_run -> verbalize"
     assert [entry["tool"] for entry in result["trace"]] == ["sql_generate", "sql_run", "verbalize"]
     assert all(entry["ok"] for entry in result["trace"])
 
@@ -139,5 +139,5 @@ def test_agent_captures_memory_preferences():
     updates = result["memory_updates"]
     assert updates["brand"] == "Puma"
     assert updates["price_ceiling"] == 3000
-    assert result["text"].splitlines()[0] == "Sprint Master: Rs.2899 (40% off), Rating: 4.7 http://x/2"
-    assert result["text"].endswith("Trace: sql_generate -> sql_run -> verbalize")
+    assert result["text"] == "Sprint Master: Rs.2899 (40% off), Rating: 4.7 http://x/2"
+    assert result["trace_line"] == "Trace: sql_generate -> sql_run -> verbalize"

@@ -18,7 +18,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from groq import Groq
 
-from app.config import DB_PATH, GROQ_MODEL_ENV, require_env
+from app.config import GROQ_MODEL_ENV, require_env, get_db_path
 from app.tools import sql_tool
 
 load_dotenv()
@@ -102,7 +102,7 @@ def _extract_sql_tagged(text: str) -> Optional[str]:
     return matches[0].strip()
 
 
-def run_query(sql: str, db_path=DB_PATH) -> Optional[pd.DataFrame]:
+def run_query(sql: str, db_path: Optional[str] = None) -> Optional[pd.DataFrame]:
     """
     Execute a SELECT query against the configured SQLite database.
 
@@ -116,8 +116,9 @@ def run_query(sql: str, db_path=DB_PATH) -> Optional[pd.DataFrame]:
     Optional[pd.DataFrame]
         Query results if SELECT, else None.
     """
+    resolved_path = db_path or str(get_db_path())
     try:
-        result = sql_tool.sql_run(sql, db_path=db_path)
+        result = sql_tool.sql_run(sql, db_path=resolved_path)
     except ValueError:
         return None
 
@@ -155,7 +156,7 @@ def sql_chain(
     question: str,
     client: Optional[Groq] = None,
     model: Optional[str] = None,
-    db_path=DB_PATH,
+    db_path: Optional[str] = None,
 ) -> str:
     """
     High-level chain: generate SQL, execute it, and verbalize the result.
