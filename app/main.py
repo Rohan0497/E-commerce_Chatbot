@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any, Dict
 
 import streamlit as st
+import time
+
 
 # Ensure absolute `app.*` imports work even when Streamlit sets cwd to app/
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -30,6 +32,7 @@ from app.tools.faq_tool import faq_search, faq_answer
 from app.tools.sql_tool import sql_generate, sql_run, verbalize
 from app.tools.memory import memory_get, memory_set
 from app.tools.web_tool import web_search
+from app.latency import LatencyRecorder
 
 try:
     from app.router import router, RouteName
@@ -154,15 +157,30 @@ def _one_time_ingestion() -> None:
     except Exception as exc:  # pragma: no cover - startup guard
         logger.exception("Failed to ingest FAQ data: %s", exc)
 
+def _init_session_state() -> None:
+    if "latency_recorder" not in st.session_state:
+        st.session_state["latency_recorder"] = LatencyRecorder(maxlen=500)
+    if "messages" not in st.session_state:
+        st.session_state["messages"] = []
+
+def _render_performance_sidebar() -> None:
+    stats = st.session_state["latency_recorder"].stats()
+    with st.sidebar:
+        st.header("Performance")
+        if stats:
+            st.metric("p50 latency (ms)", f"{stats.p50_ms:.0f}")
+            st.metric("p95 latency (ms)", f"{stats.p95_ms:.0f}")
+            st.caption(f"Measured over last {stats.n} requests")
+        else:
+            st.caption("No latency samples yet")
 
 def main() -> None:
     """Run the Streamlit chat UI."""
     st.title("E-commerce Bot")
 
     _one_time_ingestion()
-
-    if "messages" not in st.session_state:
-        st.session_state["messages"] = []
+    _init_session_state()
+    _render_performance_sidebar()
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -177,15 +195,24 @@ def main() -> None:
         st.markdown(query)
     st.session_state.messages.append({"role": "user", "content": query})
 
+    t0 = time.perf_counter()
     try:
         response = ask(query)
     except Exception as exc:
         logger.exception("Error while handling query: %s", exc)
         response = "Sorry, something went wrong while handling your request."
+    finally:
+        e2e_latency_ms = (time.perf_counter() - t0) * 1000.0
+        st.session_state["latency_recorder"].add(e2e_latency_ms)
+        logger.info("e2e_latency_ms=%.2f", e2e_latency_ms)
 
     with st.chat_message("assistant"):
         st.markdown(response)
     st.session_state.messages.append({"role": "assistant", "content": response})
+
+    # Re-render sidebar so numbers update immediately after this request
+    _render_performance_sidebar()
+
 
 
 if __name__ == "__main__":
